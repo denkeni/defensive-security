@@ -10,7 +10,7 @@ struct Item: Identifiable {
     struct Info {
         enum InfoData {
             case url(URL)
-            case string(String)
+            case whoisModal
         }
         let data: InfoData
     }
@@ -19,7 +19,15 @@ struct Item: Identifiable {
 struct ContentView: View {
     private let webView = WKWebView()
     @State private var urlString = ""
-    @State private var isChecking = true
+    private var url: URL? {
+        if let url = URL(string: urlString) {
+            return url
+        } else if let url = URL(string: "https://" + urlString) {
+            return url
+        }
+        return nil
+    }
+    @State private var isChecking = false
     @State private var modalText = ""
     @State private var showModal = false
     @State private var items = [
@@ -28,8 +36,7 @@ struct ContentView: View {
              isChecked: true),
         Item(name: "Swift Playgrounds v4.6.3"),
         Item(name: "Defensive Security Browser v0.1"),
-        Item(name: "Domain Name (whois)",
-             info: Item.Info(data: Item.Info.InfoData.string("whois information here"))),
+        Item(name: "Domain Name (whois)", info: Item.Info(data: .whoisModal)),
         Item(name: "HTTPS certificate: chain of trust")
     ]
     
@@ -53,7 +60,7 @@ struct ContentView: View {
                                     Text(item.name)
                                         .multilineTextAlignment(.leading)
                                 }
-                                .foregroundColor(item.isChecked ? .black : .red)
+                                .foregroundColor(item.isChecked ? .primary : .red)
                                 .tint(.green)
                                 .toggleStyle(.button)
                                 Spacer()
@@ -62,8 +69,7 @@ struct ContentView: View {
                                         switch info.data {
                                         case .url(let url):
                                              UIApplication.shared.open(url)
-                                        case .string(let string):
-                                            modalText = string
+                                        case .whoisModal:
                                             showModal = true
                                         }
                                     }) {
@@ -91,6 +97,10 @@ struct ContentView: View {
     
     private func startChecking() {
         isChecking = true
+        guard let host = url?.host(percentEncoded: false) else { return }
+        performWhoisQuery(for: host) { response in
+            modalText = response
+        }
     }
 
     private func allItemsChecked() -> Bool {
